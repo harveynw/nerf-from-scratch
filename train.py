@@ -6,7 +6,7 @@ import wandb
 from torch.utils.data import DataLoader
 from dataset import NerfDataset
 from model import NeRF
-from render import expected_colour
+from render import expected_colour_batched
 
 # Load dataset, from .pickle or from fresh (takes a little while to process)
 filename = 'dataset_save_chair.pickle'
@@ -26,6 +26,8 @@ lr = 5e-4
 eps = 1e-7
 weight_decay = 0.1
 
+PATH = 'model.pt'
+
 wandb.init(
     project="nerf-from-scratch",
     config={
@@ -37,16 +39,20 @@ wandb.init(
     }
 )
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 nerf: torch.nn.Module = NeRF()
+
+mps_device = torch.device("mps")
+nerf.to(mps_device)
+
 optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps, weight_decay=weight_decay)
 
 
-def train_loop(dataloader, model, loss_fn, optimiser):
+def train_loop(dataloader, model, loss_fn, optimiser, epoch):
     size = len(dataloader.dataset)
     for batch, (rgb, rays) in enumerate(dataloader):
         # Compute prediction and loss
-        loss = loss_fn(model, rgb, rays)
+        loss = loss_fn(model, rgb, rays, to_gpu=True)
 
         # Backpropagation
         optimiser.zero_grad()
@@ -54,10 +60,20 @@ def train_loop(dataloader, model, loss_fn, optimiser):
         optimiser.step()
 
         wandb.log({"train_loss": loss})
-
-        if batch % 100 == 0:
+        if batch % 10 == 0:
             loss, current = loss.item(), (batch + 1) * rgb.shape[0]
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            did_save = False
+
+            if batch % 100 == 0:
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optim.state_dict(),
+                    'loss': loss,
+                }, PATH)
+                did_save = True
+
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]", "(Checkpoint!)" if did_save else "")
 
 
 def val_loop(dataloader, model, loss_fn):
@@ -74,24 +90,22 @@ def val_loop(dataloader, model, loss_fn):
     print(f"Validation Error: \n Avg loss: {val_loss:>8f} \n")
 
 
-def loss_fn(model: torch.nn.Module, rgb: torch.Tensor, rays) -> torch.tensor:
-    loss = 0
+def loss_fn(model: torch.nn.Module, gt_color: torch.Tensor, rays: torch.Tensor, to_gpu: bool = False) -> torch.tensor:
+    batch_size = gt_color.shape[0]
+    o, d, t_n, t_f = rays[0], rays[1], rays[2][:, [0]], rays[2][:, [1]]
 
-    batch_size = rgb.shape[0]
-    n = batch_size
+    drop = torch.isneginf(t_n).squeeze()
+    gt_color, o, d, t_n, t_f = gt_color[~drop, :], o[~drop, :], d[~drop, :], t_n[~drop, :], t_f[~drop, :]
 
-    for i in range(batch_size):
-        gt_color = rgb[i, :]
-        o, d, (t_n, t_f) = rays[0][i, :], rays[1][i, :], rays[2][i, :]
+    device = 'cpu'
+    if to_gpu:
+        device = 'mps'
+        o, d, t_n, t_f = o.to(device), d.to(device), t_n.to(device), t_f.to(device)
 
-        if torch.isneginf(t_n):
-            n -= 1
-            continue
+    c = expected_colour_batched(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f, device=device)
 
-        c = expected_colour(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f)
-        loss += torch.sqrt(torch.sum(torch.square(gt_color - c)))
-
-    return loss/n
+    result = torch.sum(torch.sqrt(torch.sum(torch.square(gt_color - c), dim=1))) / batch_size  # done on CPU
+    return result
 
 
 try:
@@ -99,9 +113,8 @@ try:
 
     for t in range(n_epochs):
         print(f"Epoch {t + 1}\n-------------------------------")
-        train_loop(train_dataloader, nerf, loss_fn, optim)
+        train_loop(train_dataloader, nerf, loss_fn, optim, t + 1)
         val_loop(val_dataloader, nerf, loss_fn)
 
 except KeyboardInterrupt:
     wandb.finish()
-

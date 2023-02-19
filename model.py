@@ -43,13 +43,3 @@ class NeRF(nn.Module):  # Implementing Figure 7
         radiance = self.block_3(torch.cat([x_2[:, 1:(256+1)], direction_encoded], dim=1))
 
         return volume_density, radiance
-
-
-def gamma_encoding(p: T, l: int) -> T:  # Eqn. 4
-    assert len(p.shape) <= 1, 'must be scalar or vector'
-    if len(p.shape) == 1 and p.shape[0] > 1:
-        return torch.flatten(torch.stack([gamma_encoding(p[i], l) for i in range(p.shape[0])]))
-
-    return torch.flatten(torch.tensor(
-        [(torch.sin(2**i * torch.pi * p), torch.cos(2**i * torch.pi * p)) for i in range(l)]
-    ))

@@ -16,7 +16,7 @@ def _preprocess_view(v: View):
     t_intervals = [ray_cube_intersection(o[i, :], d[i, :]) for i in range(800*800)]
     t_intervals = np.array([[-np.inf, -np.inf] if t is None else t for t in t_intervals])
 
-    return im, o, d, t_intervals
+    return im.astype('float32'), o.astype('float32'), d.astype('float32'), t_intervals.astype('float32')
 
 
 class NerfDataset(Dataset):
