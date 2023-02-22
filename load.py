@@ -1,16 +1,35 @@
 import json
+import os
+
+import gdown
 import numpy as np
 
 from os import path
 from PIL import Image
 from collections import namedtuple
 
+
 message = """
-    Could not find the NeRF dataset, you need to create a folder in root called "data/".
-    Then navigate to the NeRF site (https://www.matthewtancik.com/nerf), click "Data".
-    Download nerf_synthetic and unzip in data folder.
+    Could not find the NeRF Synthetic dataset.
+    You can do this manually (fastest!) by following this:
+    
+        Create a folder in root called "data/". Then navigate to the NeRF paper
+        site (https://www.matthewtancik.com/nerf), click "Data". Download 
+        nerf_synthetic and unzip in the data folder.
+        
+    Otherwise this script will download it for you, just press enter.
 """
-assert path.exists("data/nerf_synthetic"), message
+
+if not path.exists("data/nerf_synthetic"):
+    print(message)
+    _ = input()
+
+    if not path.exists("data"):
+        os.mkdir("data")
+
+    url = "https://drive.google.com/drive/folders/1JDdLGDruGNXWnM1eqY1FNL9PlStjaKWi"
+    output = "data/nerf_synthetic"
+    gdown.download_folder(url=url, output=output, quiet=False, remaining_ok=True)
 
 View = namedtuple('View', 'im transform camera_angle_x')
 

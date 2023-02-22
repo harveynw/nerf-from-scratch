@@ -5,3 +5,4 @@ torch
 Pillow
 tqdm
 wandb
+gdown

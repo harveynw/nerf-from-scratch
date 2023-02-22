@@ -79,11 +79,11 @@ def expected_colour_batched(N: int, nerf: torch.nn, o: T, d: T, t_n: T, t_f: T, 
 
     T_i_inner = -σ_i*δ_i
     T_i_inner = torch.cat([torch.zeros(batch_size, 1, device=device), T_i_inner[:, :-1]], dim=1)
-    T_i = torch.exp(torch.cumsum(T_i_inner.to('cpu'), dim=1))
+    T_i = torch.exp(torch.cumsum(T_i_inner, dim=1))
 
     coef_term = 1 - torch.exp(-σ_i*δ_i)
-    coef = T_i * coef_term.to('cpu')
-    C = coef.unsqueeze(dim=2) * c_i.to('cpu')
+    coef = T_i * coef_term
+    C = coef.unsqueeze(dim=2) * c_i
     return C.sum(dim=1)
 
 

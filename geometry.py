@@ -46,24 +46,14 @@ def ray_cube_intersection(o, d):
 
 
 def find_camera_rays(transform: np.ndarray, camera_angle_x: float) -> (np.ndarray, np.ndarray):
-    # Camera intrinsic matrix
-    focal_length = 0.5 * 800 / np.tan(0.5 * camera_angle_x)
-    K = np.array([[focal_length, 0, 400], [0, focal_length, 400], [0, 0, 1]])
+    H, W = 800, 800
+    focal_length = .5 * W / np.tan(.5 * camera_angle_x)
 
-    # Ray origins
-    C = transform[:3, 3]
+    """ From the github code, Get ray origins, directions from a pinhole camera."""
+    i, j = np.meshgrid(np.arange(W, dtype=np.float32),
+                       np.arange(H, dtype=np.float32), indexing='xy')
+    dirs = np.stack([(i - W * .5) / focal_length, -(j - H * .5) / focal_length, -np.ones_like(i)], -1)
+    rays_d = np.sum(dirs[..., np.newaxis, :] * transform[:3, :3], -1)
+    rays_o = np.broadcast_to(transform[:3, -1], np.shape(rays_d))
 
-    # Pixel coordinates
-    y, x = np.mgrid[:800, :800]
-    pixels = np.column_stack((x.ravel(), y.ravel(), np.ones_like(x.ravel())))
-
-    # Ray directions
-    R = np.linalg.inv(K) @ pixels.T
-    R = transform[:3, :3] @ R
-    R /= np.linalg.norm(R, axis=0)
-
-    # Ray origins and directions
-    origins = np.tile(C, (R.shape[1], 1)).T
-    directions = R
-
-    return origins.reshape((3, 800*800)).T, -directions.reshape((3, 800*800)).T
+    return rays_o.reshape(H*W, 3), rays_d.reshape(H*W, 3)

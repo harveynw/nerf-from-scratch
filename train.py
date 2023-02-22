@@ -41,9 +41,9 @@ wandb.init(
 
 torch.set_default_dtype(torch.float32)
 nerf: torch.nn.Module = NeRF()
-
-mps_device = torch.device("mps")
-nerf.to(mps_device)
+device = 'mps'
+# device = 'cpu'
+nerf.to(device)
 
 optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps, weight_decay=weight_decay)
 
@@ -52,7 +52,7 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
     size = len(dataloader.dataset)
     for batch, (rgb, rays) in enumerate(dataloader):
         # Compute prediction and loss
-        loss = loss_fn(model, rgb, rays, to_gpu=True)
+        loss = loss_fn(model, rgb, rays, device=device)
 
         # Backpropagation
         optimiser.zero_grad()
@@ -90,26 +90,19 @@ def val_loop(dataloader, model, loss_fn):
     print(f"Validation Error: \n Avg loss: {val_loss:>8f} \n")
 
 
-def loss_fn(model: torch.nn.Module, gt_color: torch.Tensor, rays: torch.Tensor, to_gpu: bool = False) -> torch.tensor:
+def loss_fn(model: torch.nn.Module, gt_color: torch.Tensor, rays: torch.Tensor, device: str = 'cpu') -> torch.tensor:
     batch_size = gt_color.shape[0]
     o, d, t_n, t_f = rays[0], rays[1], rays[2][:, [0]], rays[2][:, [1]]
+    o, d, t_n, t_f = o.to(device), d.to(device), t_n.to(device), t_f.to(device)
 
-    drop = torch.isneginf(t_n).squeeze()
-    gt_color, o, d, t_n, t_f = gt_color[~drop, :], o[~drop, :], d[~drop, :], t_n[~drop, :], t_f[~drop, :]
+    c = expected_colour_batched(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f, device=device).to('cpu')
+    loss = torch.sum(torch.sqrt(torch.sum(torch.square(gt_color - c), dim=1))) / batch_size
 
-    device = 'cpu'
-    if to_gpu:
-        device = 'mps'
-        o, d, t_n, t_f = o.to(device), d.to(device), t_n.to(device), t_f.to(device)
-
-    c = expected_colour_batched(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f, device=device)
-
-    result = torch.sum(torch.sqrt(torch.sum(torch.square(gt_color - c), dim=1))) / batch_size  # done on CPU
-    return result
+    return loss
 
 
 try:
-    n_epochs = 100
+    n_epochs = 7  # Paper details
 
     for t in range(n_epochs):
         print(f"Epoch {t + 1}\n-------------------------------")
