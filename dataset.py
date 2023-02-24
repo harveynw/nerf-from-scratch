@@ -1,4 +1,6 @@
 import numpy as np
+import pickle
+import os
 
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -24,17 +26,31 @@ def _preprocess_view(v: View, filter_empty_rays: bool):
 
 
 class NerfDataset(Dataset):
-    def __init__(self, scene='chair', subset='train', max_views=-1, filter_empty_rays=True):
-        self.view_examples = []
-        view_count = 0
-        for v in tqdm(load(scene=scene, subset=subset), desc=f'Preprocess "{scene}:{subset}" '):
-            self.view_examples += [_preprocess_view(v, filter_empty_rays)]
+    def __init__(self, scene='chair', subset='train', max_views=-1, filter_empty_rays=True, refresh=False):
+        self.id = f'{scene}_{subset}_{"all" if max_views == -1 else max_views}{"_filter" if filter_empty_rays else ""}'
+        self.filename = self.id + '.pickle'
+        self.cache_path = os.path.join('cache', self.filename)
 
-            view_count += 1
-            if view_count == max_views:
-                break
+        if os.path.exists(self.cache_path) and not refresh:
+            with open(self.cache_path, 'rb') as f:
+                self.__dict__ = pickle.load(f)
+        else:
+            self.view_examples = []
 
-        self.res = 800
+            view_count = 0
+            for v in tqdm(load(scene=scene, subset=subset), desc=f'Preprocess "{scene}:{subset}" '):
+                self.view_examples += [_preprocess_view(v, filter_empty_rays)]
+
+                view_count += 1
+                if view_count == max_views:
+                    break
+
+            self.res = 800
+
+            if not os.path.exists('cache'):
+                os.mkdir('cache')
+            with open(self.cache_path, 'wb') as f:
+                pickle.dump(self.__dict__, f)
 
     def __len__(self):
         return sum([v[0].shape[0] for v in self.view_examples])
