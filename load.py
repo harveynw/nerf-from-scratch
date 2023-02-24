@@ -26,7 +26,7 @@ if not path.exists("data/nerf_synthetic"):
     if not path.exists("data"):
         os.mkdir("data")
 
-    # # Download
+    # Download
     url = "https://drive.google.com/uc?id=18JxhpWD-4ZmuFKLzKlAw-w5PpzZxXOcG"
     output = "data/nerf_synthetic.zip"
     gdown.download(url=url, output=output, quiet=False)

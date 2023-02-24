@@ -58,7 +58,7 @@ class NerfDataset(Dataset):
     def __getitem__(self, idx):
         for v in self.view_examples:
             view_examples = v[0].shape[0]
-            if idx > view_examples:
+            if idx >= view_examples:
                 idx -= view_examples
             else:
                 im, o, d, t_intervals = v
