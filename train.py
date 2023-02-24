@@ -1,5 +1,3 @@
-import os
-import pickle
 import torch
 import wandb
 
@@ -9,14 +7,7 @@ from model import NeRF
 from render import expected_colour_batched
 
 # Load dataset, from .pickle or from fresh (takes a little while to process)
-filename = 'dataset_save_chair.pickle'
-if os.path.exists(filename):
-    with open(filename, 'rb') as f:
-        train, val, _ = pickle.load(f)
-else:
-    train, val, test = NerfDataset('chair', 'train'), NerfDataset('chair', 'val'), NerfDataset('chair', 'test')
-    with open(filename, 'wb') as f:
-        pickle.dump((train, val, test), f)
+train, val, test = NerfDataset('chair', 'train'), NerfDataset('chair', 'val'), NerfDataset('chair', 'test')
 
 train_dataloader = DataLoader(train, batch_size=4096, shuffle=True)
 val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
@@ -34,7 +25,7 @@ wandb.init(
         "learning_rate": lr,
         "eps": eps,
         "weight_decay": weight_decay,
-        "dataset": filename,
+        "dataset": train.filename,
         "epochs": 10,
     }
 )
