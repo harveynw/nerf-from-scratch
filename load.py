@@ -1,6 +1,5 @@
 import json
 import os
-
 import gdown
 import numpy as np
 
@@ -27,9 +26,15 @@ if not path.exists("data/nerf_synthetic"):
     if not path.exists("data"):
         os.mkdir("data")
 
-    url = "https://drive.google.com/drive/folders/1JDdLGDruGNXWnM1eqY1FNL9PlStjaKWi"
-    output = "data/nerf_synthetic"
-    gdown.download_folder(url=url, output=output, quiet=False, remaining_ok=True)
+    # # Download
+    url = "https://drive.google.com/uc?id=18JxhpWD-4ZmuFKLzKlAw-w5PpzZxXOcG"
+    output = "data/nerf_synthetic.zip"
+    gdown.download(url=url, output=output, quiet=False)
+
+    # Unzip
+    import zipfile
+    with zipfile.ZipFile(output, "r") as zip_ref:
+        zip_ref.extractall("data")
 
 View = namedtuple('View', 'im transform camera_angle_x')
 
