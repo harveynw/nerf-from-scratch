@@ -1,3 +1,4 @@
+import os
 import torch
 import wandb
 
@@ -32,12 +33,11 @@ wandb.init(
 
 torch.set_default_dtype(torch.float32)
 nerf: torch.nn.Module = NeRF()
-device = 'mps'
-# device = 'cpu'
+device = os.getenv("DEVICE", "cpu")
 nerf.to(device)
 
 optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
-scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
+# scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
 
 
 def train_loop(dataloader, model, loss_fn, optimiser, epoch):
@@ -49,6 +49,7 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
         # Backpropagation
         optimiser.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimiser.step()
 
         wandb.log({"train_loss": loss})
@@ -100,7 +101,7 @@ try:
         print(f"Epoch {t + 1}\n-------------------------------")
         train_loop(train_dataloader, nerf, loss_fn, optim, t + 1)
 
-        scheduler.step()
+        # scheduler.step()
 
         val_loop(val_dataloader, nerf, loss_fn)
 
