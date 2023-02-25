@@ -36,7 +36,8 @@ device = 'mps'
 # device = 'cpu'
 nerf.to(device)
 
-optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps, weight_decay=weight_decay)
+optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
 
 
 def train_loop(dataloader, model, loss_fn, optimiser, epoch):
@@ -98,6 +99,9 @@ try:
     for t in range(n_epochs):
         print(f"Epoch {t + 1}\n-------------------------------")
         train_loop(train_dataloader, nerf, loss_fn, optim, t + 1)
+
+        scheduler.step()
+
         val_loop(val_dataloader, nerf, loss_fn)
 
 except KeyboardInterrupt:
