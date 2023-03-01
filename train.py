@@ -5,7 +5,8 @@ import wandb
 from torch.utils.data import DataLoader
 from dataset import NerfDataset
 from model import NeRF
-from render import expected_colour_batched
+from render import expected_colour
+from torch.optim.lr_scheduler import ExponentialLR
 
 # Load dataset, from .pickle or from fresh (takes a little while to process)
 train, val, test = NerfDataset('chair', 'train'), NerfDataset('chair', 'val'), NerfDataset('chair', 'test')
@@ -15,8 +16,11 @@ val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
 
 # Train
 lr = 5e-4
+# lr = 5e-5
 eps = 1e-7
 weight_decay = 0.1
+gradient_clip = 0.1
+n_epochs = 7
 
 PATH = 'model.pt'
 
@@ -26,8 +30,9 @@ wandb.init(
         "learning_rate": lr,
         "eps": eps,
         "weight_decay": weight_decay,
+        "gradient_clip": gradient_clip,
         "dataset": train.filename,
-        "epochs": 10,
+        "n_epochs": n_epochs,
     }
 )
 
@@ -38,22 +43,33 @@ nerf.to(device)
 
 optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
+scheduler_test = ExponentialLR(optim, gamma=0.9)
+scheduler = scheduler_test
 
 
 def train_loop(dataloader, model, loss_fn, optimiser, epoch):
     size = len(dataloader.dataset)
     for batch, (rgb, rays) in enumerate(dataloader):
         # Compute prediction and loss
-        loss = loss_fn(model, rgb, rays, device=device)
+        loss = loss_fn(model, rgb, rays, device=device).to('cpu')
 
         # Backpropagation
         optimiser.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
         optimiser.step()
 
+        # Debugging
+        nan_count = 0
+        nan_count += torch.sum(torch.isnan(rgb)).item()
+        nan_count += torch.sum(torch.isnan(rays[0])).item()
+        nan_count += torch.sum(torch.isnan(rays[1])).item()
+        nan_count += torch.sum(torch.isnan(rays[2])).item()
+        nan_gradients = sum([torch.sum(torch.isnan(p.grad)).item() for p in model.parameters()])
+        print(f'Batch Size: {rgb.shape[0]} NaN Count Dataset: {nan_count} NaN Gradients: {nan_gradients}')
+
         wandb.log({"train_loss": loss})
-        if batch % 10 == 0:
+        if batch % 1 == 0:
             loss, current = loss.item(), (batch + 1) * rgb.shape[0]
             did_save = False
 
@@ -87,21 +103,20 @@ def loss_fn(model: torch.nn.Module, gt_color: torch.Tensor, rays: torch.Tensor, 
     batch_size = gt_color.shape[0]
     o, d, t_n, t_f = rays[0], rays[1], rays[2][:, [0]], rays[2][:, [1]]
     o, d, t_n, t_f = o.to(device), d.to(device), t_n.to(device), t_f.to(device)
+    gt_color = gt_color.to(device)
 
-    c = expected_colour_batched(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f, device=device).to('cpu')
+    c = expected_colour(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f, device=device)
     loss = torch.sum(torch.sqrt(torch.sum(torch.square(gt_color - c), dim=1))) / batch_size
 
     return loss
 
 
 try:
-    n_epochs = 7  # Paper details
-
     for t in range(n_epochs):
         print(f"Epoch {t + 1}\n-------------------------------")
         train_loop(train_dataloader, nerf, loss_fn, optim, t + 1)
 
-        # scheduler.step()
+        scheduler.step()
 
         val_loop(val_dataloader, nerf, loss_fn)
 
