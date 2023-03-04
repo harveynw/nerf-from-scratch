@@ -8,6 +8,8 @@ from model import NeRF
 from render import expected_colour
 from torch.optim.lr_scheduler import ExponentialLR
 
+from run_model import compare_output
+
 # Load dataset, from .pickle or from fresh (takes a little while to process)
 train, val, test = NerfDataset('chair', 'train'), NerfDataset('chair', 'val'), NerfDataset('chair', 'test')
 
@@ -16,10 +18,9 @@ val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
 
 # Train
 lr = 5e-4
-# lr = 5e-5
-eps = 1e-7
+# eps = 1e-7
 weight_decay = 0.1
-gradient_clip = 0.1
+gradient_clip = 1e-2
 n_epochs = 7
 
 PATH = 'model.pt'
@@ -28,7 +29,7 @@ wandb.init(
     project="nerf-from-scratch",
     config={
         "learning_rate": lr,
-        "eps": eps,
+        # "eps": eps,
         "weight_decay": weight_decay,
         "gradient_clip": gradient_clip,
         "dataset": train.filename,
@@ -41,7 +42,8 @@ nerf: torch.nn.Module = NeRF()
 device = os.getenv("DEVICE", "cpu")
 nerf.to(device)
 
-optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
+# optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
+optim = torch.optim.Adam(nerf.parameters(), lr=5e-4)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
 scheduler_test = ExponentialLR(optim, gamma=0.9)
 scheduler = scheduler_test
@@ -50,6 +52,8 @@ scheduler = scheduler_test
 def train_loop(dataloader, model, loss_fn, optimiser, epoch):
     size = len(dataloader.dataset)
     for batch, (rgb, rays) in enumerate(dataloader):
+
+        # with torch.autograd.set_detect_anomaly(True):
         # Compute prediction and loss
         loss = loss_fn(model, rgb, rays, device=device).to('cpu')
 
@@ -73,12 +77,15 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
             loss, current = loss.item(), (batch + 1) * rgb.shape[0]
             did_save = False
 
-            if batch % 100 == 0:
+            if batch % 4 == 0:
+                fig, _ = compare_output(model, dataloader.dataset)
+                wandb.log({"comparison": fig})
+
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optim.state_dict(),
-                    'loss': loss,
+                    'loss': loss
                 }, PATH)
                 did_save = True
 

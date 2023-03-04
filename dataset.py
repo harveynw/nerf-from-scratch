@@ -15,12 +15,15 @@ def _preprocess_view(v: View, filter_empty_rays: bool):
     o, d = find_camera_rays(transform, camera_angle_x)
     im = im.reshape(800*800, 3) / 255.0
 
-    t_intervals = [ray_cube_intersection(o[i, :], d[i, :]) for i in range(800*800)]
-    t_intervals = np.array([[-np.inf, -np.inf] if t is None else t for t in t_intervals])
+    # Old code assuming object lies in [-1, 1]^3, discarding rays that don't pass through that
+    # t_intervals = [ray_cube_intersection(o[i, :], d[i, :]) for i in range(800*800)]
+    # t_intervals = np.array([[-np.inf, -np.inf] if t is None else t for t in t_intervals])
+    # if filter_empty_rays:
+    #     drop = ~np.isneginf(t_intervals[:, 0])
+    #     im, o, d, t_intervals = im[drop, :], o[drop, :], d[drop, :], t_intervals[drop, :]
 
-    if filter_empty_rays:
-        drop = ~np.isneginf(t_intervals[:, 0])
-        im, o, d, t_intervals = im[drop, :], o[drop, :], d[drop, :], t_intervals[drop, :]
+    # NeRF codebase, they arbitrarily set near=2., far=6.
+    t_intervals = np.array([[2., 6.] for _ in range(800*800)])
 
     return im.astype('float32'), o.astype('float32'), d.astype('float32'), t_intervals.astype('float32')
 

@@ -6,3 +6,4 @@ Pillow
 tqdm
 wandb
 gdown
+torchviz
