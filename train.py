@@ -18,7 +18,7 @@ val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
 
 # Train
 # lr = 5e-4
-lr = 5e-6
+lr = 5e-7
 # eps = 1e-7
 weight_decay = 0.1
 gradient_clip = 1e-2
@@ -78,7 +78,7 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
             exit()
 
         wandb.log({"train_loss": loss})
-        if batch % 100 == 0:
+        if batch % 500 == 0:
             loss, current = loss.item(), (batch + 1) * rgb.shape[0]
             did_save = False
 
