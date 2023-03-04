@@ -44,7 +44,7 @@ device = os.getenv("DEVICE", "cpu")
 nerf.to(device)
 
 # optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
-optim = torch.optim.Adam(nerf.parameters(), lr=5e-4)
+optim = torch.optim.Adam(nerf.parameters(), lr=lr)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
 scheduler_test = ExponentialLR(optim, gamma=0.9)
 scheduler = scheduler_test
