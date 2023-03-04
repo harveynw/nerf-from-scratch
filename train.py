@@ -79,7 +79,7 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
             did_save = False
 
             if batch % 4 == 0:
-                fig, _ = compare_output(model, dataloader.dataset)
+                fig, _ = compare_output(model, dataloader.dataset, device=device)
                 wandb.log({"comparison": fig})
 
                 torch.save({
