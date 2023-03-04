@@ -7,6 +7,7 @@ def _nan_check(x : T, name: str):
     count = torch.sum(torch.isnan(x)).to('cpu')
     if count > 0:
         print(f'ALERT check for NaN in {name} found {count}')
+        exit()
 
 
 def gamma_encoding(p: T, l: int, device: str = 'cpu') -> T:  # Eqn. 4, p is (batch_size, dim)
