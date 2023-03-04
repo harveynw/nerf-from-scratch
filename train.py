@@ -17,8 +17,8 @@ train_dataloader = DataLoader(train, batch_size=4096, shuffle=True)
 val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
 
 # Train
-lr = 5e-4
-# lr = 5e-6
+# lr = 5e-4
+lr = 5e-6
 # eps = 1e-7
 weight_decay = 0.1
 gradient_clip = 1e-2
@@ -65,13 +65,17 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
         optimiser.step()
 
         # Debugging
-        nan_count = 0
-        nan_count += torch.sum(torch.isnan(rgb)).item()
-        nan_count += torch.sum(torch.isnan(rays[0])).item()
-        nan_count += torch.sum(torch.isnan(rays[1])).item()
-        nan_count += torch.sum(torch.isnan(rays[2])).item()
+        # nan_count = 0
+        # nan_count += torch.sum(torch.isnan(rgb)).item()
+        # nan_count += torch.sum(torch.isnan(rays[0])).item()
+        # nan_count += torch.sum(torch.isnan(rays[1])).item()
+        # nan_count += torch.sum(torch.isnan(rays[2])).item()
         nan_gradients = sum([torch.sum(torch.isnan(p.grad)).item() for p in model.parameters()])
-        print(f'Batch Size: {rgb.shape[0]} NaN Count Dataset: {nan_count} NaN Gradients: {nan_gradients}')
+        # print(f'Batch Size: {rgb.shape[0]} NaN Count Dataset: {nan_count} NaN Gradients: {nan_gradients}')
+
+        if nan_gradients > 0:
+            print('nan gradient')
+            exit()
 
         wandb.log({"train_loss": loss})
         if batch % 100 == 0:
