@@ -10,17 +10,6 @@ def _nan_check(x : T, name: str):
         exit()
 
 
-def gamma_encoding(p: T, l: int, device: str = 'cpu') -> T:  # Eqn. 4, p is (batch_size, dim)
-    coef = torch.pow(2, torch.arange(start=0, end=l, step=1)).to(device) * torch.pi
-
-    dim = p.shape[1]
-    rad = p.unsqueeze(2).repeat(1, 1, l) * coef.view(1, 1, l)
-    s = torch.sin(rad).view(-1, dim*l)
-    c = torch.cos(rad).view(-1, dim*l)
-
-    return torch.stack([s, c], dim=2).view(-1, 2*dim*l)
-
-
 def expected_colour(N: int, nerf: torch.nn, o: T, d: T, t_n: T, t_f: T, device: str = 'cpu'):  # Approx Eqn. 1
     batch_size = o.shape[0]
 
@@ -36,14 +25,11 @@ def expected_colour(N: int, nerf: torch.nn, o: T, d: T, t_n: T, t_f: T, device: 
     o_t, d_t = o.unsqueeze(1), d.unsqueeze(1)  # batch_size x 1 x 3
     positions = o_t + t * d_t
     positions = positions.view(batch_size*N, 3)  # batch_size*N x 3
+    directions = d.repeat_interleave(N, dim=0)
 
-    # Forward pass on network, from paper: L = 10 for γ(x) and L = 4 for γ(d) for position and view direction
-    position_encoded = gamma_encoding(positions, 10, device=device)
-    direction_encoded = gamma_encoding(d, 4, device=device).repeat(N, 1)
+    _nan_check(positions, 'Positions'), _nan_check(directions, 'Directions')
 
-    _nan_check(position_encoded, 'Position Encoded'), _nan_check(direction_encoded, 'Direction Encoded')
-
-    σ_i, c_i = nerf(position_encoded, direction_encoded)
+    σ_i, c_i = nerf(positions, directions)
 
     _nan_check(σ_i, 'NN Output Volume Density')
     _nan_check(c_i, 'NN Output Radiance')

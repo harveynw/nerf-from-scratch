@@ -7,7 +7,6 @@ from dataset import NerfDataset
 from model import NeRF
 from render import expected_colour
 from torch.optim.lr_scheduler import ExponentialLR
-
 from run_model import compare_output
 
 # Load dataset, from .pickle or from fresh (takes a little while to process)
@@ -17,11 +16,10 @@ train_dataloader = DataLoader(train, batch_size=4096, shuffle=True)
 val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
 
 # Train
-# lr = 5e-4
-lr = 5e-7
-# eps = 1e-7
+lr = 5e-4
+eps = 1e-7
 weight_decay = 0.1
-gradient_clip = 1e-2
+gradient_clip = 1.0
 n_epochs = 7
 
 PATH = 'model.pt'
@@ -30,7 +28,7 @@ wandb.init(
     project="nerf-from-scratch",
     config={
         "learning_rate": lr,
-        # "eps": eps,
+        "eps": eps,
         "weight_decay": weight_decay,
         "gradient_clip": gradient_clip,
         "dataset": train.filename,
@@ -43,8 +41,8 @@ nerf: torch.nn.Module = NeRF()
 device = os.getenv("DEVICE", "cpu")
 nerf.to(device)
 
-# optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
-optim = torch.optim.Adam(nerf.parameters(), lr=lr)
+optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
+# optim = torch.optim.Adam(nerf.parameters(), lr=lr)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optim, gamma=weight_decay)
 scheduler_test = ExponentialLR(optim, gamma=0.9)
 scheduler = scheduler_test
@@ -77,12 +75,12 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
             print('nan gradient')
             exit()
 
-        wandb.log({"train_loss": loss})
-        if batch % 500 == 0:
+        wandb.log({"train_loss": loss, "average_pixel_loss": loss/rgb.shape[0]})
+        if batch % 100 == 0:
             loss, current = loss.item(), (batch + 1) * rgb.shape[0]
             did_save = False
 
-            if batch % 4 == 0:
+            if batch % 500 == 0:
                 fig, _ = compare_output(model, dataloader.dataset, device=device)
                 wandb.log({"comparison": fig})
 
@@ -112,13 +110,12 @@ def val_loop(dataloader, model, loss_fn):
 
 
 def loss_fn(model: torch.nn.Module, gt_color: torch.Tensor, rays: torch.Tensor, device: str = 'cpu') -> torch.tensor:
-    batch_size = gt_color.shape[0]
     o, d, t_n, t_f = rays[0], rays[1], rays[2][:, [0]], rays[2][:, [1]]
     o, d, t_n, t_f = o.to(device), d.to(device), t_n.to(device), t_f.to(device)
     gt_color = gt_color.to(device)
 
     c = expected_colour(N=100, nerf=model, o=o, d=d, t_n=t_n, t_f=t_f, device=device)
-    loss = torch.sum(torch.sqrt(torch.sum(torch.square(gt_color - c), dim=1))) / batch_size
+    loss = torch.sum(torch.sqrt(torch.sum(torch.square(gt_color - c), dim=1)))
 
     return loss
 

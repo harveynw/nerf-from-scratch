@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from dataset import NerfDataset
-from model import NeRF
+from model import NeRF, DebugNeRF
 from render import expected_colour
 
 
@@ -49,15 +49,17 @@ def compare_output(model: torch.nn.Module, dataset: NerfDataset, view_idx: int =
 
 
 if __name__ == '__main__':
-    model = NeRF()
-    checkpoint = torch.load('model.pt')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
-    model.to('mps')
+    # model = NeRF()
+    # checkpoint = torch.load('model.pt')
+    # model.load_state_dict(checkpoint['model_state_dict'])
+    # model.eval()
+    # model.to('mps')
+
+    model = DebugNeRF('balls')
 
     dataset = NerfDataset('chair', 'train')
 
-    fig, ax = compare_output(model, dataset)
+    fig, ax = compare_output(model, dataset, device='cpu')
     plt.show()
 
 
