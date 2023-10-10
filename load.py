@@ -51,9 +51,7 @@ def _parse_frame(dir: str, frame_dict: dict):
 
     rgba_im = Image.open(path.join(dir, file_path) + '.png')
     rgba_im.load()
-    
-    # Were going to downsize to 100x100 as I don't have all day
-    rgba_im = rgba_im.resize((100, 100))
+    rgba_im = rgba_im.resize((100, 100), Image.NEAREST)
 
     im = Image.new("RGB", rgba_im.size)
     im.paste(rgba_im, mask=rgba_im.split()[3])

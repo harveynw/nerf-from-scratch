@@ -10,11 +10,12 @@ def _nan_check(x : T, name: str):
         exit()
 
 
-def expected_colour(N: int, nerf: torch.nn, o: T, d: T, t_n: T, t_f: T, device: str = 'cpu'):  # Approx Eqn. 1
+def expected_colour(N: int, nerf: torch.nn, o: T, d: T, t_n: float, t_f: float, device: str = 'cpu'):  # Approx Eqn. 1
     batch_size = o.shape[0]
 
     # Eqn. 2 - Stratified sampling of points along ray
-    t_n, t_f = t_n.reshape((-1, 1)), t_f.reshape((-1, 1))
+    t_n = torch.tensor([t_n]).repeat((batch_size, 1))
+    t_f = torch.tensor([t_f]).repeat((batch_size, 1))
     i = torch.arange(start=1, end=N + 1, step=1, device=device).reshape((1, N)).repeat(batch_size, 1)
     lower = t_n + (i - 1) / N * (t_f - t_n)
     upper = t_n + i / N * (t_f - t_n)

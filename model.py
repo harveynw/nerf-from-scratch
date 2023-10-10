@@ -19,6 +19,19 @@ class PositionalEncoding(nn.Module):
         return torch.stack([s, c], dim=2).view(-1, 2 * dim * self.L)
 
 
+class SimpleEncoding(nn.Module):
+    def __init__(self, L: int):
+        super(SimpleEncoding, self).__init__()
+        self.L = L
+
+    def forward(self, vectors: T) -> T:
+        elements = [vectors]
+        for i in range(self.L):
+            elements += [torch.sin(2.0**i * vectors), torch.cos(2.0**i * vectors)]
+        return torch.concat(elements, dim=1)
+
+
+
 class DebugNeRF(nn.Module):
     def __init__(self, mode: str = 'balls'):
         super(DebugNeRF, self).__init__()
@@ -149,32 +162,4 @@ class TinyNeRF(nn.Module):
         x = torch.concat([p, d], dim=1)
         y = torch.concat([self.block_1(x), x], dim=1)
         z = self.output_layer(self.block_2(y))
-        return torch.relu(z[:, 3]), torch.sigmoid(z[:, :3])
-
-
-class TinyNeRF2(nn.Module):
-    def __init__(self): 
-        super(TinyNeRF2, self).__init__()
-        
-        input_dim = 60 + 24 # Positional plus direction encoding         
- 
-        self.enc_position = PositionalEncoding(L=10)
-        self.enc_direction = PositionalEncoding(L=4)
- 
-        self.block = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, 4),
-        ) 
-        
-
-    def forward(self, position: T, direction: T) -> (T, T):
-        p, d = self.enc_position(position), self.enc_direction(direction)
-
-        x = torch.concat([p, d], dim=1)
-        z = self.block(x)
         return torch.relu(z[:, 3]), torch.sigmoid(z[:, :3])
