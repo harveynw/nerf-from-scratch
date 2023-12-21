@@ -3,7 +3,7 @@ Implementing "Neural Radiance Fields" from the original paper.
 
 <hr>
 
-Torch implementation, training is currently still bugged (likely a problem with positional encoding).
+Torch implementation, training after a couple of epochs:
 
 <img src="img/bugged_comparison.png"/>
 

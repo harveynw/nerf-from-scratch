@@ -5,6 +5,9 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from geometry import find_camera_rays
 from load import load
 
+# Configure here and run the script
+DATASET = 'chair'  # 'drums', 'lego' etc..
+
 
 def arrow_3d(ax: plt.axis, origin, dir, **kwargs):
     """ Arrow 3D
@@ -52,7 +55,11 @@ def plot_unit_cube(ax):
 
 
 def plot_rays(ax, transform, camera_angle_x):
-    origins, directions = find_camera_rays(transform, camera_angle_x)
+    """ plot_rays
+
+    Plots the rays generated for a given camera view (and viewing angle)
+    """
+    origins, directions = find_camera_rays(transform, camera_angle_x, 100, 100)
 
     dirs = origins + directions
 
@@ -68,7 +75,7 @@ def plot_rays(ax, transform, camera_angle_x):
     points_3d(ax, o + t_linspace * d, s=1)
 
 
-for item in load('chair', 'train'):
+for item in load(DATASET, 'train'):
     im, transform, camera_angle_x = item
 
     fig = plt.figure()

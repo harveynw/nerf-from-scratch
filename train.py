@@ -10,24 +10,19 @@ from torch.optim.lr_scheduler import ExponentialLR
 from run_model import compare_output
 from loss import total_colour_loss, mean_colour_loss
 
-# Load dataset, from .pickle or from fresh (takes a little while to process)
-# train, val, test = NerfDataset('chair', 'train'), NerfDataset('chair', 'val'), NerfDataset('chair', 'test')
-# train, val, test = NerfDataset('chair', 'train', 1), NerfDataset('chair', 'val', 1), NerfDataset('chair', 'test')
-# train_dataloader = DataLoader(train, batch_size=4096, shuffle=True)
-# val_dataloader = DataLoader(val, batch_size=256, shuffle=True)
 
-# Experimenting with new grouped dataset
+# Configure dataset
 train, val, test = NerfDataset('lego', 'train'), NerfDataset('lego', 'val'), NerfDataset('lego', 'test')
 train_dataloader = DataLoader(train, batch_size=100, shuffle=True)
 val_dataloader = DataLoader(val, batch_size=64, shuffle=True)
 
 # Train
-# nerf: torch.nn.Module = NeRF()
-nerf: torch.nn.Module = TinyNeRF()
+nerf: torch.nn.Module = NeRF()
+# nerf: torch.nn.Module = TinyNeRF()
 
 lr = 5e-4
 eps = 1e-8
-weight_decay = 0.1
+weight_decay = 0.5
 enable_gradient_clip = False
 gradient_clip = 1.0
 n_epochs = 7
@@ -35,12 +30,13 @@ n_epochs = 7
 # Optimisation
 loss = mean_colour_loss
 optim = torch.optim.Adam(nerf.parameters(), lr=lr, eps=eps)
-scheduler_test = ExponentialLR(optim, gamma=0.9)
+scheduler_test = ExponentialLR(optim, gamma=weight_decay)
 scheduler = scheduler_test
 
-batches_per_loss_report = 10
-batches_per_checkpoint = 100
-batches_per_gt_test = 50
+batches_per_loss_report = 100
+batches_per_checkpoint = 500
+batches_per_gt_test = 500
+batches_per_train_loop = 2000
 
 PATH = 'model.pt'
 
@@ -64,10 +60,10 @@ nerf.to(device)
 
 
 def train_loop(dataloader, model, loss_fn, optimiser, epoch):
-    size = len(dataloader.dataset)
+    train_examples = batches_per_train_loop * dataloader.batch_size
     for batch, (rgb, rays) in enumerate(dataloader):
         # Backpropagation
-        loss = loss_fn(model, rgb, rays, dataset.NEAR, dataset.FAR, device=device).to('cpu')
+        loss = loss_fn(model, rgb, rays, device=device).to('cpu')
         optimiser.zero_grad()
         loss.backward()
 
@@ -85,20 +81,21 @@ def train_loop(dataloader, model, loss_fn, optimiser, epoch):
                 'loss': loss
             }, PATH)
         if batch % batches_per_gt_test == 0:
-            fig, _ = compare_output(model, dataloader.dataset, view_idx=2, near=dataset.NEAR, far=dataset.FAR, device=device)
+            fig, _ = compare_output(model, dataloader.dataset, view_idx=2, device=device)
             wandb.log({"comparison": fig}) 
         if batch % batches_per_loss_report == 0:
             loss, current = loss.item(), (batch + 1) * rgb.shape[0]
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-
+            print(f"loss: {loss:>7f}  [{current:>5d}/{train_examples:>5d}]")
+        if batch == batches_per_train_loop-1:
+            break
 
 def val_loop(dataloader, model, loss_fn):
     num_batches = len(dataloader)
-    val_loss, correct = 0, 0
+    val_loss = 0
 
     with torch.no_grad():
         for rgb, rays in dataloader:
-            val_loss += loss_fn(model, rgb, rays, dataset.NEAR, dataset.FAR, device=device).to('cpu').item()
+            val_loss += loss_fn(model, rgb, rays, device=device).to('cpu').item()
 
     val_loss /= num_batches
 
@@ -110,7 +107,7 @@ try:
     for t in range(n_epochs):
         print(f"Epoch {t + 1}\n-------------------------------")
         train_loop(train_dataloader, nerf, loss, optim, t + 1)
-        scheduler.step()
         val_loop(val_dataloader, nerf, loss)
+        scheduler.step()
 except KeyboardInterrupt:
     wandb.finish()

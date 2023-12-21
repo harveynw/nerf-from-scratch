@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from dataset import NerfDataset
-from model import NeRF, DebugNeRF
+from model import NeRF, DebugNeRF, TinyNeRF
 from render import expected_colour
 
 
-def compare_output(model: torch.nn.Module, dataset: NerfDataset, near: float, far: float, view_idx: int = 0, device: str = 'mps'):
+def compare_output(model: torch.nn.Module, dataset: NerfDataset, view_idx: int = 0, device: str = 'mps', close_plt=True):
     # Compare output to g.t. on specified view
     v = dataset.view_examples[view_idx]
 
@@ -26,7 +26,7 @@ def compare_output(model: torch.nn.Module, dataset: NerfDataset, near: float, fa
         o_k, d_k = o_batches[0], d_batches[0]
         with torch.no_grad():
             model_outputs += [
-                expected_colour(N=100, nerf=model, o=o_k, d=d_k, t_n=near, t_f=far, device=device).to('cpu')
+                expected_colour(N=100, nerf=model, o=o_k, d=d_k, device=device).to('cpu')
             ]
         o_batches.pop(0), d_batches.pop(0)
         pbar.update(1)
@@ -45,22 +45,25 @@ def compare_output(model: torch.nn.Module, dataset: NerfDataset, near: float, fa
 
     ax_render.set_title('NeRF')
     ax_im.set_title('Ground Truth')
+    if close_plt:
+        plt.close()
 
     return fig, (ax_render, ax_im)
 
 
 if __name__ == '__main__':
+    #model = TinyNeRF()
     model = NeRF()
     checkpoint = torch.load('model.pt')
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-    model.to('mps')
 
+    #model = DebugNeRF('balls')
     #model = DebugNeRF('center_balls')
+    dataset = NerfDataset('lego', 'test')
 
-    dataset = NerfDataset('chair', 'train')
-
-    fig, ax = compare_output(model, dataset, device='cpu')
-    plt.show()
+    for i, _ in enumerate(dataset.view_examples):
+        fig, ax = compare_output(model, dataset, view_idx=i, device='cpu', close_plt=False)
+        plt.show()
 
 
